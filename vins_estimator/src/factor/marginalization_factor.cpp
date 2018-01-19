@@ -236,12 +236,16 @@ void MarginalizationInfo::marginalize()
     pthread_t tids[NUM_THREADS];
     ThreadsStruct threadsstruct[NUM_THREADS];
     int i = 0;
+
+    // hs: 将几个因子（factors）推入到子因子（sub-factors）中，以前只推入了三个：（1）以前边缘化的信息。（2）边缘化掉的famer信息(1个)
+    //     以及(3)边缘化掉的camera 测量信息,这个是多个
     for (auto it : factors)
     {
         threadsstruct[i].sub_factors.push_back(it);
         i++;
         i = i % NUM_THREADS;
     }
+    // hs: 创建4个线程计算
     for (int i = 0; i < NUM_THREADS; i++)
     {
         TicToc zero_matrix;
@@ -256,6 +260,7 @@ void MarginalizationInfo::marginalize()
             ROS_BREAK();
         }
     }
+    // hs: 计算A和b
     for( int i = NUM_THREADS - 1; i >= 0; i--)  
     {
         pthread_join( tids[i], NULL ); 

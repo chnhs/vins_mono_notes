@@ -36,13 +36,14 @@ struct ResidualBlockInfo
     }
 };
 
+//
 struct ThreadsStruct
 {
-    std::vector<ResidualBlockInfo *> sub_factors;
-    Eigen::MatrixXd A;
-    Eigen::VectorXd b;
-    std::unordered_map<long, int> parameter_block_size; //global size
-    std::unordered_map<long, int> parameter_block_idx; //local size
+    std::vector<ResidualBlockInfo *> sub_factors;                     // hs: sub_factor 残差模型
+    Eigen::MatrixXd A;                                                // hs: information matrix 信息矩阵
+    Eigen::VectorXd b;                                                // hs: information vector 信息向量
+    std::unordered_map<long, int> parameter_block_size; //global size // hs: 不懂，什么global size 还是 local size
+    std::unordered_map<long, int> parameter_block_idx; //local size   // hs: 不懂
 };
 
 class MarginalizationInfo

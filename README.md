@@ -1,3 +1,6 @@
+# vins_mono_notes
+学习vins_mono过程中的一些注释，记录自己的学习过程，详情请看下面。
+
 # VINS-Mono
 ## A Robust and Versatile Monocular Visual-Inertial State Estimator
 
