@@ -61,7 +61,7 @@ std_msgs::Header cur_header;
 Eigen::Vector3d relocalize_t{Eigen::Vector3d(0, 0, 0)};
 Eigen::Matrix3d relocalize_r{Eigen::Matrix3d::Identity()};
 
-
+/*hs: 为了提供高频率的反馈，只要来IMU信息就输出*/
 void predict(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     double t = imu_msg->header.stamp.toSec();
@@ -93,6 +93,12 @@ void predict(const sensor_msgs::ImuConstPtr &imu_msg)
     acc_0 = linear_acceleration;
     gyr_0 = angular_velocity;
 }
+
+/*
+ * hs: 昨天晚上想了一晚上关于这个东西怎么更新的，其实就是就是以窗口内最后一帧数作为后验估计，然后每来一帧imu
+ *     数据做一次PVG运算。然后后验计算（获取较为精准的PV值）过程中,可能会累积一些IMU数据，这时在更新完成后
+ *     需要先把计算过程中的这些数据累加，然后作为下一次运算的后验估计。
+ */
 
 void update()
 {
@@ -167,6 +173,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
     }
 }
 
+/* hs :  raw image主要用于loop closer(闭环检测）*/
 void raw_image_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
     cv_bridge::CvImagePtr img_ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::MONO8);
@@ -436,10 +443,15 @@ void process_pose_graph()
 }
 
 // thread: visual-inertial odometry
+/*
+ * hs: 处理的主过程，看懂你就可以写文章了
+ */
 void process()
 {
+    // hs: 一直循环着
     while (true)
     {
+        // hs: measurement 代表图像的特征点与IMU测量在一段时间的组合,first 是imu, second 是图像特征点
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
         std::unique_lock<std::mutex> lk(m_buf);
         con.wait(lk, [&]
@@ -450,12 +462,14 @@ void process()
 
         for (auto &measurement : measurements)
         {
+            // hs: imu预积分
             for (auto &imu_msg : measurement.first)
                 send_imu(imu_msg);
 
             auto img_msg = measurement.second;
             ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
 
+            // hs: 构造特征点并进行处理
             TicToc t_s;
             map<int, vector<pair<int, Vector3d>>> image;
             for (unsigned int i = 0; i < img_msg->points.size(); i++)
@@ -586,7 +600,8 @@ int main(int argc, char **argv)
     ROS_WARN("waiting for image and imu...");
 
     registerPub(n);
-
+    
+    // hs: Receive imu image and raw image;
     ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_image = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
     ros::Subscriber sub_raw_image = n.subscribe(IMAGE_TOPIC, 2000, raw_image_callback);

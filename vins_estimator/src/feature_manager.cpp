@@ -33,6 +33,7 @@ int FeatureManager::getFeatureCount()
 
         it.used_num = it.feature_per_frame.size();
 
+        // hs: 如果该点被使用两次及两次以上并且该特征首次被发现帧至少在
         if (it.used_num >= 2 && it.start_frame < WINDOW_SIZE - 2)
         {
             cnt++;
@@ -41,7 +42,7 @@ int FeatureManager::getFeatureCount()
     return cnt;
 }
 
-
+/* hs: 检查视差，决定是否为关键帧以及边缘化条件*/
 bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Vector3d>>> &image)
 {
     ROS_DEBUG("input feature: %d", (int)image.size());
@@ -49,6 +50,8 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
     double parallax_sum = 0;
     int parallax_num = 0;
     last_track_num = 0;
+
+    // hs: 跟以前累计的特征点进行比较，如果ID相同，则为跟踪点
     for (auto &id_pts : image)
     {
         FeaturePerFrame f_per_fra(id_pts.second[0].second);
@@ -71,11 +74,14 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
         }
     }
 
+    // hs: 如果是前两帧或者如果跟踪点的数量小于20，则认为是关键帧keyframe
     if (frame_count < 2 || last_track_num < 20)
         return true;
 
+    // hs: 计算视差，具体公式可以推导一下
     for (auto &it_per_id : feature)
     {
+        // hs: 如果该特征的起始帧是（当前帧-2）以内或者？？？
         if (it_per_id.start_frame <= frame_count - 2 &&
             it_per_id.start_frame + int(it_per_id.feature_per_frame.size()) - 1 >= frame_count - 1)
         {
@@ -90,6 +96,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
     }
     else
     {
+        // hs: 计算平均视差
         ROS_DEBUG("parallax_sum: %lf, parallax_num: %d", parallax_sum, parallax_num);
         ROS_DEBUG("current parallax: %lf", parallax_sum / parallax_num * FOCAL_LENGTH);
         return parallax_sum / parallax_num >= MIN_PARALLAX;

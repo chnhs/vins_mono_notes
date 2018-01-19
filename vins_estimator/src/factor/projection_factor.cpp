@@ -5,6 +5,7 @@ double ProjectionFactor::sum_t;
 
 ProjectionFactor::ProjectionFactor(const Eigen::Vector3d &_pts_i, const Eigen::Vector3d &_pts_j) : pts_i(_pts_i), pts_j(_pts_j)
 {
+    // hs: 投影到均匀球的相机测量残差
 #ifdef UNIT_SPHERE_ERROR
     Eigen::Vector3d b1, b2;
     Eigen::Vector3d a = pts_j.normalized();
@@ -18,9 +19,15 @@ ProjectionFactor::ProjectionFactor(const Eigen::Vector3d &_pts_i, const Eigen::V
 #endif
 };
 
+/*
+ *
+ */
+
 bool ProjectionFactor::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
 {
+    /* hs: 更新残差(residuals)*/
     TicToc tic_toc;
+    // hs: i的位置和旋转，j的位置和旋转，IMU和相机之间的位移的旋转
     Eigen::Vector3d Pi(parameters[0][0], parameters[0][1], parameters[0][2]);
     Eigen::Quaterniond Qi(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]);
 
@@ -30,24 +37,32 @@ bool ProjectionFactor::Evaluate(double const *const *parameters, double *residua
     Eigen::Vector3d tic(parameters[2][0], parameters[2][1], parameters[2][2]);
     Eigen::Quaterniond qic(parameters[2][6], parameters[2][3], parameters[2][4], parameters[2][5]);
 
+    // hs: 反向深度参数，用于估计真正的位置
     double inv_dep_i = parameters[3][0];
 
+    // hs: 在相机坐标系下的三维点位置→IMU坐标系下的三维点位置→世界坐标系三维点位置
     Eigen::Vector3d pts_camera_i = pts_i / inv_dep_i;
     Eigen::Vector3d pts_imu_i = qic * pts_camera_i + tic;
     Eigen::Vector3d pts_w = Qi * pts_imu_i + Pi;
+
+    // hs: 世界坐标系三维点位置→IMU坐标系下位置→相机坐标系下的位置
     Eigen::Vector3d pts_imu_j = Qj.inverse() * (pts_w - Pj);
     Eigen::Vector3d pts_camera_j = qic.inverse() * (pts_imu_j - tic);
     Eigen::Map<Eigen::Vector2d> residual(residuals);
 
+    // hs: 计算相机测量残差（camera measure residuals）
 #ifdef UNIT_SPHERE_ERROR 
     residual =  tangent_base * (pts_camera_j.normalized() - pts_j.normalized());
 #else
     double dep_j = pts_camera_j.z();
     residual = (pts_camera_j / dep_j).head<2>() - pts_j.head<2>();
 #endif
-
+    // hs: 在http://blog.csdn.net/q597967420/article/details/76099443中进行了描述，因为真正的优化项其实实时Mahalanobis距离：
+    //     d=rTP−1r, P是协方差, 而ceres只接受最小二乘优化, 也就是mineTe, 所以把P−1做LLT分解即LLT=P−1, 那么d=rTLLTr=(LTr)T(LTr),
+    //     令r′=LTr作为新的优化误差, 这样就能用ceres求解了.LTr就是代码中的sqrt_info.
     residual = sqrt_info * residual;
 
+    /* hs: 更新雅克比矩阵（jacobians）*/
     if (jacobians)
     {
         Eigen::Matrix3d Ri = Qi.toRotationMatrix();

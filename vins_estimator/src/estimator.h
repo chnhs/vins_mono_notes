@@ -21,6 +21,7 @@
 #include <queue>
 #include <opencv2/core/eigen.hpp>
 
+/* hs: 用于闭环检测*/
 struct RetriveData
 {
     /* data */
@@ -64,7 +65,6 @@ class Estimator
     void double2vector();
     bool failureDetection();
 
-
     enum SolverFlag
     {
         INITIAL,
@@ -77,55 +77,59 @@ class Estimator
         MARGIN_SECOND_NEW = 1
     };
 
-    SolverFlag solver_flag;
-    MarginalizationFlag  marginalization_flag;
-    Vector3d g;
-    MatrixXd Ap[2], backup_A;
-    VectorXd bp[2], backup_b;
+    SolverFlag solver_flag;				            	// hs: 求解器标志，初始化或者非线性优化
+    MarginalizationFlag  marginalization_flag;			// hs: 边缘化标志，边缘化old 或者 second new
+    
+    Vector3d g;							                // hs： 重力向量
+    MatrixXd Ap[2], backup_A;					// hs: no use
+    VectorXd bp[2], backup_b;					// hs: no use
 
-    Matrix3d ric[NUM_OF_CAM];
-    Vector3d tic[NUM_OF_CAM];
+    Matrix3d ric[NUM_OF_CAM];					// hs: 相机和IMU之间的旋转
+    Vector3d tic[NUM_OF_CAM];					// hs: 相机和IMU之间的平移
 
-    Vector3d Ps[(WINDOW_SIZE + 1)];
-    Vector3d Vs[(WINDOW_SIZE + 1)];
-    Matrix3d Rs[(WINDOW_SIZE + 1)];
-    Vector3d Bas[(WINDOW_SIZE + 1)];
-    Vector3d Bgs[(WINDOW_SIZE + 1)];
+    Vector3d Ps[(WINDOW_SIZE + 1)];				// hs: slideWindow 中每一帧的位置
+    Vector3d Vs[(WINDOW_SIZE + 1)];				// hs: slideWindow 中每一帧的速度
+    Matrix3d Rs[(WINDOW_SIZE + 1)];				// hs: slideWindow 中每一帧的旋转矩阵
+    Vector3d Bas[(WINDOW_SIZE + 1)];				// hs: slideWindow 中每一帧的加速度计偏置
+    Vector3d Bgs[(WINDOW_SIZE + 1)];				// hs: slideWindow 中每一帧的陀螺偏置
 
-    Matrix3d back_R0, last_R, last_R0;
-    Vector3d back_P0, last_P, last_P0;
-    std_msgs::Header Headers[(WINDOW_SIZE + 1)];
-
-    IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];
+    Matrix3d back_R0, last_R, last_R0;				// hs: slideWindow 中使用
+    Vector3d back_P0, last_P, last_P0;				// hs: slideWindow 中使用
+    std_msgs::Header Headers[(WINDOW_SIZE + 1)];		// hs: slideWindow 中每一帧的头文件
+    
+    /* hs :预积分，陀螺和加速度计数据*/
+    IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];	// hs: slideWindow 中每一帧的预积分数据
     Vector3d acc_0, gyr_0;
 
-    vector<double> dt_buf[(WINDOW_SIZE + 1)];
-    vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];
-    vector<Vector3d> angular_velocity_buf[(WINDOW_SIZE + 1)];
+    vector<double> dt_buf[(WINDOW_SIZE + 1)];			// hs： slideWindow 中每一帧之间imu帧间隔
+    vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];// hs: slideWindow 中每一帧之间imu加速度数据
+    vector<Vector3d> angular_velocity_buf[(WINDOW_SIZE + 1)];	// hs: slideWindow 中每一帧之间imu陀螺数据
 
     int frame_count;
-    int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;
+    int sum_of_front, sum_of_back;			// hs: 统计量，边缘化的次数，如果边缘化老的sum_of_front + 1，否则sum_of_back + 1
+    int sum_of_outlier, sum_of_invalid;				// hs: no use
 
-    FeatureManager f_manager;
+    FeatureManager f_manager;					// hs: 特征管理器
     MotionEstimator m_estimator;
-    InitialEXRotation initial_ex_rotation;
+    InitialEXRotation initial_ex_rotation;			// hs: 当需要通过程序进行外参估计时，利用该类进行运算
 
-    bool first_imu;
-    bool is_valid, is_key;
-    bool failure_occur;
+    bool first_imu;						// hs: 标志，是否为第一个IMU数据
+    bool is_valid, is_key;					// hs: no use
+    bool failure_occur;						// hs: 检测是否跟踪失败
 
-    vector<Vector3d> point_cloud;
-    vector<Vector3d> margin_cloud;
-    vector<Vector3d> key_poses;
-    double initial_timestamp;
+    vector<Vector3d> point_cloud;				// hs: no use
+    vector<Vector3d> margin_cloud;				// hs: no use
+    vector<Vector3d> key_poses;					// hs: 用于显示
+    double initial_timestamp;					// hs: 初始化时间戳
 
-
+    /* hs: 用于优化时的参数*/
     double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
     double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
     double para_Feature[NUM_OF_F][SIZE_FEATURE];
     double para_Ex_Pose[NUM_OF_CAM][SIZE_POSE];
     double para_Retrive_Pose[SIZE_POSE];
-
+    
+    /* hs: 用于闭环检测*/
     RetriveData retrive_pose_data, front_pose;
     vector<RetriveData> retrive_data_vector;
     int loop_window_index;

@@ -90,16 +90,18 @@ void MarginalizationInfo::addResidualBlockInfo(ResidualBlockInfo *residual_block
 {
     factors.emplace_back(residual_block_info);
 
-    std::vector<double *> &parameter_blocks = residual_block_info->parameter_blocks;
-    std::vector<int> parameter_block_sizes = residual_block_info->cost_function->parameter_block_sizes();
+    std::vector<double *> &parameter_blocks = residual_block_info->parameter_blocks;                        // hs: 参数块
+    std::vector<int> parameter_block_sizes = residual_block_info->cost_function->parameter_block_sizes();   // hs: 每个参数块的长度
 
+    // hs: 保存每个参数的地址及长度
     for (int i = 0; i < static_cast<int>(residual_block_info->parameter_blocks.size()); i++)
     {
         double *addr = parameter_blocks[i];
         int size = parameter_block_sizes[i];
-        parameter_block_size[reinterpret_cast<long>(addr)] = size;
+        parameter_block_size[reinterpret_cast<long>(addr)] = size; // hs: 保存地址addr（long类型）和长度size（int类型）
     }
 
+    // hs: 想干掉什么，设置什么？
     for (int i = 0; i < static_cast<int>(residual_block_info->drop_set.size()); i++)
     {
         double *addr = parameter_blocks[residual_block_info->drop_set[i]];
@@ -174,6 +176,7 @@ void* ThreadsConstructA(void* threadsstruct)
 void MarginalizationInfo::marginalize()
 {
     int pos = 0;
+    // 第一个参数是0，第二个参数设置参数块对应的长度
     for (auto &it : parameter_block_idx)
     {
         it.second = pos;
@@ -318,18 +321,22 @@ std::vector<double *> MarginalizationInfo::getParameterBlocks(std::unordered_map
     return keep_block_addr;
 }
 
+// hs: 构造函数，作用是利用上一次边缘化的数据
 MarginalizationFactor::MarginalizationFactor(MarginalizationInfo* _marginalization_info):marginalization_info(_marginalization_info)
 {
     int cnt = 0;
     for (auto it : marginalization_info->keep_block_size)
     {
+        // hs: 输入参数块的数量和大小
         mutable_parameter_block_sizes()->push_back(it);
         cnt += it;
     }
     //printf("residual size: %d, %d\n", cnt, n);
+    // hs: 输出参数块的数量
     set_num_residuals(marginalization_info->n);
 };
 
+// hs: 通过看教程，Evaluate函数主要用于计算残差向量（residual vector）和雅克比矩阵（jacobians matrix）
 bool MarginalizationFactor::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
 {
     //printf("internal addr,%d, %d\n", (int)parameter_block_sizes().size(), num_residuals());

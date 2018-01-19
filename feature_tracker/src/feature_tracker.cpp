@@ -5,9 +5,12 @@ int FeatureTracker::n_id = 0;
 bool inBorder(const cv::Point2f &pt)
 {
     const int BORDER_SIZE = 1;
+    /*
+     *  cvRound，函数的一种，对一个double型的数进行四舍五入。
+     */
     int img_x = cvRound(pt.x);
     int img_y = cvRound(pt.y);
-    return BORDER_SIZE <= img_x && img_x < COL - BORDER_SIZE && BORDER_SIZE <= img_y && img_y < ROW - BORDER_SIZE;
+    return (BORDER_SIZE <= img_x) && (img_x < COL - BORDER_SIZE) && (BORDER_SIZE <= img_y) && (img_y < ROW - BORDER_SIZE);
 }
 
 void reduceVector(vector<cv::Point2f> &v, vector<uchar> status)
@@ -18,6 +21,7 @@ void reduceVector(vector<cv::Point2f> &v, vector<uchar> status)
             v[j++] = v[i];
     v.resize(j);
 }
+
 
 void reduceVector(vector<int> &v, vector<uchar> status)
 {
@@ -77,11 +81,17 @@ void FeatureTracker::addPoints()
     }
 }
 
+/*
+ * readImage函数：
+ *      作用： 单目相机读取图像并进行一系列的运算
+ */
+
 void FeatureTracker::readImage(const cv::Mat &_img)
 {
     cv::Mat img;
     TicToc t_r;
 
+    /* hs: CLAHE均衡化，增加图像之间的对比度 */
     if (EQUALIZE)
     {
         cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
@@ -108,8 +118,10 @@ void FeatureTracker::readImage(const cv::Mat &_img)
         TicToc t_o;
         vector<uchar> status;
         vector<float> err;
+        // hs: 光流跟踪
         cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3);
 
+        // hs: 光流跟踪状态，找到跟踪效果比较好的
         for (int i = 0; i < int(forw_pts.size()); i++)
             if (status[i] && !inBorder(forw_pts[i]))
                 status[i] = 0;
@@ -161,14 +173,45 @@ void FeatureTracker::readImage(const cv::Mat &_img)
     cur_img = forw_img;
     cur_pts = forw_pts;
 }
-
+/*
+ * cvFindFundamentalMat函数：
+ *  作用： 两幅图像的对应点计算基本矩阵
+ *  函数形式：int cvFindFundamentalMat( const CvMat* points1, const CvMat* points2, CvMat* fundamental_matrix,
+ *                      int method=CV_FM_RANSAC, double param1=1., double param2=0.99, CvMat* status=NULL);
+ *  参数介绍：
+ *          · points1
+ *          第一幅图像点的数组，大小为2xN/Nx2 或 3xN/Nx3 (N 点的个数)，多通道的1xN或Nx1也可以。点坐标应该是浮点数(双精度或单精度)。:
+ *          · points2
+ *          第二副图像的点的数组，格式、大小与第一幅图像相同。
+ *          · fundamental_matrix
+ *          输出的基本矩阵。大小是 3x3 或者 9x3 ，(7-点法最多可返回三个矩阵).
+ *          · method
+ *          计算基本矩阵的方法
+ *               CV_FM_7POINT – 7-点算法，点数目= 7
+ *               CV_FM_8POINT – 8-点算法，点数目 >= 8
+ *               CV_FM_RANSAC – RANSAC 算法，点数目 >= 8
+ *               CV_FM_LMEDS - LMedS 算法，点数目 >= 8
+ *          · param1
+ *          这个参数只用于方法RANSAC。它是点到对极线的最大距离，超过这个值的点将被舍弃，不用于后面的计算。通常这个值的设定是0.5 or 1.0 。
+ *          · param2
+ *          这个参数只用于方法RANSAC 或 LMedS 。 它表示矩阵正确的可信度。例如可以被设为0.99 。
+ *          · status
+ *          具有N个元素的输出数组，在计算过程中没有被舍弃的点，元素被被置为1；否则置为0。这个数组只可以在方法RANSAC and LMedS 情况下使用；
+ *          在其它方法的情况下，status一律被置为1。这个参数是可选参数。'
+ *
+ *  rejectWithF函数：
+ *    作用： 根据上一帧和当前帧的特征点，计算其基本矩阵，采用RANSAC剔除outlier（异常值）
+ */
 void FeatureTracker::rejectWithF()
 {
+    // hs: 因为采用的是RANSAC算法，要求特征点数大于8个
     if (forw_pts.size() >= 8)
     {
         ROS_DEBUG("FM ransac begins");
         TicToc t_f;
         vector<cv::Point2f> un_prev_pts(prev_pts.size()), un_forw_pts(forw_pts.size());
+
+        // hs: 获取无畸变的图像点，然后计算基本矩阵
         for (unsigned int i = 0; i < prev_pts.size(); i++)
         {
             Eigen::Vector3d tmp_p;
@@ -208,6 +251,10 @@ bool FeatureTracker::updateID(unsigned int i)
         return false;
 }
 
+/*
+ * readIntrinsicParameter函数：
+ *      作用：从文件里读取相机内参
+ */
 void FeatureTracker::readIntrinsicParameter(const string &calib_file)
 {
     ROS_INFO("reading paramerter of camera %s", calib_file.c_str());

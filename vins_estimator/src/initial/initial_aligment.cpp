@@ -1,7 +1,10 @@
 #include "initial_alignment.h"
 
+/* hs : 求解初始陀螺偏置*/
 void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
 {
+
+    // hs: 构建方程，求解陀螺偏置，其基本思路是通过图像前后帧的旋转获取相对旋转，然后在结合IMU预积分，可以获取偏置
     Matrix3d A;
     Vector3d b;
     Vector3d delta_bg;
@@ -26,9 +29,11 @@ void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
     delta_bg = A.ldlt().solve(b);
     ROS_WARN_STREAM("gyroscope bias initial calibration " << delta_bg.transpose());
 
+    // hs： 对每一帧的偏置进行修改
     for (int i = 0; i <= WINDOW_SIZE; i++)
         Bgs[i] += delta_bg;
 
+    // hs： 对预积分结果进行修正
     for (frame_i = all_image_frame.begin(); next(frame_i) != all_image_frame.end( ); frame_i++)
     {
         frame_j = next(frame_i);
@@ -52,6 +57,7 @@ MatrixXd TangentBasis(Vector3d &g0)
     return bc;
 }
 
+// hs: 切线空间重新求解重力
 void RefineGravity(map<double, ImageFrame> &all_image_frame, Vector3d &g, VectorXd &x)
 {
     Vector3d g0 = g.normalized() * G.norm();
@@ -122,10 +128,17 @@ void RefineGravity(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vector
     g = g0;
 }
 
+/*
+ * hs： 初始化每一帧的速度V，还有重力g及尺度s
+ *
+ * Reference: http://blog.csdn.net/wangshuailpp/article/details/78719531
+ * 主要目的是构建 |C0坐标系下的重力矢量|位置的尺度信息|k时刻IMU坐标系下的速度
+ */
+
 bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, VectorXd &x)
 {
     int all_frame_count = all_image_frame.size();
-    int n_state = all_frame_count * 3 + 3 + 1;
+    int n_state = all_frame_count * 3 + 3 + 1;    // hs: 要求的值，三轴速度，重力矢量以及尺度
 
     MatrixXd A{n_state, n_state};
     A.setZero();
@@ -185,7 +198,7 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
     {
         return false;
     }
-
+    
     RefineGravity(all_image_frame, g, x);
     s = (x.tail<1>())(0) / 100.0;
     (x.tail<1>())(0) = s;
@@ -196,6 +209,7 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
         return true;
 }
 
+/* hs : 视觉和IMU对齐 */
 bool VisualIMUAlignment(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs, Vector3d &g, VectorXd &x)
 {
     solveGyroscopeBias(all_image_frame, Bgs);

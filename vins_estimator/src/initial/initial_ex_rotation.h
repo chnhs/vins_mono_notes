@@ -11,6 +11,7 @@ using namespace Eigen;
 #include <ros/console.h>
 
 /* This class help you to calibrate extrinsic rotation between imu and camera when your totally don't konw the extrinsic parameter */
+/* 如果你完全不知到camera和imu之间的外置参数（也就是camera坐标系和imu坐标系之间的R和t），该类将帮助你获取该参数*/
 class InitialEXRotation
 {
 public:

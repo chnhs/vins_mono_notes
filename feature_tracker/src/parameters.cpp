@@ -18,6 +18,7 @@ int FOCAL_LENGTH;
 int FISHEYE;
 bool PUB_THIS_FRAME;
 
+/* hs: 从launch文件中获取配置路径信息 */
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)
 {
@@ -34,6 +35,7 @@ T readParam(ros::NodeHandle &n, std::string name)
     return ans;
 }
 
+/* hs: 从配置文件中读取参数 */
 void readParameters(ros::NodeHandle &n)
 {
     std::string config_file;

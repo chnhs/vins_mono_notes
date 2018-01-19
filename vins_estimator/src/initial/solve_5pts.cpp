@@ -189,7 +189,17 @@ namespace cv {
     }
 }
 
-
+/*
+ * hs: 5点法恢复两帧之间的相对旋转与相对位移
+ *
+ * input:
+ *       corres :     两帧之间的对应点
+ *       Rotation：   两帧之间的旋转  （待求）
+ *       Translation：两帧之间的位移  （待求）
+ * output：
+ *      bool量： 5点法求解是否成功
+ *
+ */
 bool MotionEstimator::solveRelativeRT(const vector<pair<Vector3d, Vector3d>> &corres, Matrix3d &Rotation, Vector3d &Translation)
 {
     if (corres.size() >= 15)
@@ -201,7 +211,7 @@ bool MotionEstimator::solveRelativeRT(const vector<pair<Vector3d, Vector3d>> &co
             rr.push_back(cv::Point2f(corres[i].second(0), corres[i].second(1)));
         }
         cv::Mat mask;
-        cv::Mat E = cv::findFundamentalMat(ll, rr, cv::FM_RANSAC, 0.3 / 460, 0.99, mask);
+        cv::Mat E = cv::findFundamentalMat(ll, rr, cv::FM_RANSAC, 0.3 / 460, 0.99, mask);// hs： 一直不知道460是什么鬼、、、
         cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1, 0, 0, 0, 1, 0, 0, 0, 1);
         cv::Mat rot, trans;
         int inlier_cnt = cv::recoverPose(E, ll, rr, cameraMatrix, rot, trans, mask);

@@ -1,3 +1,15 @@
+/*
+ *  特征跟踪：
+ *  ·   KLT稀疏光流法+角点提取 获取特征点
+ *  ·   设置特征点之间的最小间隔，强制特征点均匀分布
+ *  ·   异常值剔除（outlier rejection）,通过RANSAC的方式进行基本矩阵（Fundamental matrix）测试
+ *  ·   把特征点投到均匀球上
+ *
+ *  此源文件介绍：
+ *  ·   该cpp文件接收img_callback主题发布的图像并发出特征点以及原始图像
+ */
+
+
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -21,6 +33,8 @@ double first_image_time;
 int pub_count = 1;
 bool first_image_flag = true;
 
+
+/* hs: 图像发布回调函数 */
 void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
     if(first_image_flag)
@@ -66,47 +80,46 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         trackerData[i].showUndistortion("undistrotion_" + std::to_string(i));
 #endif
     }
-
-    if ( PUB_THIS_FRAME && STEREO_TRACK && trackerData[0].cur_pts.size() > 0)
-    {
+// hs: stereo 的使用，暂时不看
+    if (!PUB_THIS_FRAME || !STEREO_TRACK || trackerData[0].cur_pts.size() <= 0) {}
+    else {
         pub_count++;
         r_status.clear();
         r_err.clear();
         TicToc t_o;
-        cv::calcOpticalFlowPyrLK(trackerData[0].cur_img, trackerData[1].cur_img, trackerData[0].cur_pts, trackerData[1].cur_pts, r_status, r_err, cv::Size(21, 21), 3);
+        cv::calcOpticalFlowPyrLK(trackerData[0].cur_img, trackerData[1].cur_img, trackerData[0].cur_pts,
+                                 trackerData[1].cur_pts, r_status, r_err, cv::Size(21, 21), 3);
         ROS_DEBUG("spatial optical flow costs: %fms", t_o.toc());
         vector<cv::Point2f> ll, rr;
         vector<int> idx;
-        for (unsigned int i = 0; i < r_status.size(); i++)
-        {
+        for (unsigned int i = 0; i < r_status.size(); i++) {
             if (!inBorder(trackerData[1].cur_pts[i]))
                 r_status[i] = 0;
 
-            if (r_status[i])
-            {
+            if (r_status[i]) {
                 idx.push_back(i);
 
                 Eigen::Vector3d tmp_p;
-                trackerData[0].m_camera->liftProjective(Eigen::Vector2d(trackerData[0].cur_pts[i].x, trackerData[0].cur_pts[i].y), tmp_p);
+                trackerData[0].m_camera->liftProjective(
+                        Eigen::Vector2d(trackerData[0].cur_pts[i].x, trackerData[0].cur_pts[i].y), tmp_p);
                 tmp_p.x() = FOCAL_LENGTH * tmp_p.x() / tmp_p.z() + COL / 2.0;
                 tmp_p.y() = FOCAL_LENGTH * tmp_p.y() / tmp_p.z() + ROW / 2.0;
                 ll.push_back(cv::Point2f(tmp_p.x(), tmp_p.y()));
 
-                trackerData[1].m_camera->liftProjective(Eigen::Vector2d(trackerData[1].cur_pts[i].x, trackerData[1].cur_pts[i].y), tmp_p);
+                trackerData[1].m_camera->liftProjective(
+                        Eigen::Vector2d(trackerData[1].cur_pts[i].x, trackerData[1].cur_pts[i].y), tmp_p);
                 tmp_p.x() = FOCAL_LENGTH * tmp_p.x() / tmp_p.z() + COL / 2.0;
                 tmp_p.y() = FOCAL_LENGTH * tmp_p.y() / tmp_p.z() + ROW / 2.0;
                 rr.push_back(cv::Point2f(tmp_p.x(), tmp_p.y()));
             }
         }
-        if (ll.size() >= 8)
-        {
+        if (ll.size() >= 8) {
             vector<uchar> status;
             TicToc t_f;
             cv::findFundamentalMat(ll, rr, cv::FM_RANSAC, 1.0, 0.5, status);
             ROS_DEBUG("find f cost: %f", t_f.toc());
             int r_cnt = 0;
-            for (unsigned int i = 0; i < status.size(); i++)
-            {
+            for (unsigned int i = 0; i < status.size(); i++) {
                 if (status[i] == 0)
                     r_status[idx[i]] = 0;
                 r_cnt += r_status[idx[i]];
@@ -230,6 +243,8 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     ROS_INFO("whole feature tracker processing costs: %f", t_r.toc());
 }
 
+
+/* hs: 主函数*/
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "feature_tracker");
@@ -240,6 +255,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < NUM_OF_CAM; i++)
         trackerData[i].readIntrinsicParameter(CAM_NAMES[i]);
 
+    // hs: 读取FISHEYE
     if(FISHEYE)
     {
         for (int i = 0; i < NUM_OF_CAM; i++)

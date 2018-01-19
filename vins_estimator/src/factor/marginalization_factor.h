@@ -12,6 +12,8 @@
 
 const int NUM_THREADS = 4;
 
+
+// hs: Marginalization 残差项构建 （上一次的残差+IMU+投影误差）
 struct ResidualBlockInfo
 {
     ResidualBlockInfo(ceres::CostFunction *_cost_function, ceres::LossFunction *_loss_function, std::vector<double *> _parameter_blocks, std::vector<int> _drop_set)
@@ -19,9 +21,9 @@ struct ResidualBlockInfo
 
     void Evaluate();
 
-    ceres::CostFunction *cost_function;
-    ceres::LossFunction *loss_function;
-    std::vector<double *> parameter_blocks;
+    ceres::CostFunction *cost_function;         // hs: 计算函数
+    ceres::LossFunction *loss_function;         // hs: 损失函数
+    std::vector<double *> parameter_blocks;     // hs: 参数块
     std::vector<int> drop_set;
 
     double **raw_jacobians;
@@ -54,19 +56,19 @@ class MarginalizationInfo
     void marginalize();
     std::vector<double *> getParameterBlocks(std::unordered_map<long, double *> &addr_shift);
 
-    std::vector<ResidualBlockInfo *> factors;
+    std::vector<ResidualBlockInfo *> factors;           // hs: 残差因子
     int m, n;
-    std::unordered_map<long, int> parameter_block_size; //global size
+    std::unordered_map<long, int> parameter_block_size; //global size // hs: 保存参数的地址和长度
     int sum_block_size;
     std::unordered_map<long, int> parameter_block_idx; //local size
-    std::unordered_map<long, double *> parameter_block_data;
+    std::unordered_map<long, double *> parameter_block_data; // hs: 保存参数的地址和数据
 
     std::vector<int> keep_block_size; //global size
     std::vector<int> keep_block_idx;  //local size
     std::vector<double *> keep_block_data;
 
-    Eigen::MatrixXd linearized_jacobians;
-    Eigen::VectorXd linearized_residuals;
+    Eigen::MatrixXd linearized_jacobians;// hs: H
+    Eigen::VectorXd linearized_residuals;// hs: b
     const double eps = 1e-8;
 
 };
@@ -74,8 +76,8 @@ class MarginalizationInfo
 class MarginalizationFactor : public ceres::CostFunction
 {
   public:
-    MarginalizationFactor(MarginalizationInfo* _marginalization_info);
-    virtual bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const;
+    MarginalizationFactor(MarginalizationInfo* _marginalization_info);                                  // hs： 构造函数
+    virtual bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const;// hs: 运算函数
 
-    MarginalizationInfo* marginalization_info;
+    MarginalizationInfo* marginalization_info;      // hs: 保存的边缘化信息
 };

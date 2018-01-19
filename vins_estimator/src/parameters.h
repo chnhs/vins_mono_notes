@@ -47,6 +47,7 @@ extern std::string IMU_TOPIC;
 
 void readParameters(ros::NodeHandle &n);
 
+/* hs:各个参数所占大小*/
 enum SIZE_PARAMETERIZATION
 {
     SIZE_POSE = 7,
@@ -54,6 +55,7 @@ enum SIZE_PARAMETERIZATION
     SIZE_FEATURE = 1
 };
 
+/* hs: 状态顺序*/
 enum StateOrder
 {
     O_P = 0,
@@ -63,6 +65,7 @@ enum StateOrder
     O_BG = 12
 };
 
+/* hs: 噪声顺序*/
 enum NoiseOrder
 {
     O_AN = 0,

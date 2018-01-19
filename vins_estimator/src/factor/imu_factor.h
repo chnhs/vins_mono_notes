@@ -182,7 +182,7 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
     //void checkCorrection();
     //void checkTransition();
     //void checkJacobian(double **parameters);
-    IntegrationBase* pre_integration;
+    IntegrationBase* pre_integration; // hs: 预积分结果
 
 };
 

@@ -15,6 +15,7 @@ using namespace Eigen;
 
 #include "parameters.h"
 
+// hs: 该类根据每一帧保存三维点（3d point）
 class FeaturePerFrame
 {
   public:
@@ -31,6 +32,9 @@ class FeaturePerFrame
     VectorXd b;
     double dep_gradient;
 };
+
+
+// hs: 该类根据每个id保存特征
 
 class FeaturePerId
 {

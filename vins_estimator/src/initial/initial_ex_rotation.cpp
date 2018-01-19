@@ -10,10 +10,10 @@ InitialEXRotation::InitialEXRotation(){
 
 bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> corres, Quaterniond delta_q_imu, Matrix3d &calib_ric_result)
 {
-    frame_count++;
-    Rc.push_back(solveRelativeR(corres));
-    Rimu.push_back(delta_q_imu.toRotationMatrix());
-    Rc_g.push_back(ric.inverse() * delta_q_imu * ric);
+    frame_count++;                                                                   // hs: 这个frame_count和上一层的不一样
+    Rc.push_back(solveRelativeR(corres));                                            // hs: 求解当前帧与上一帧的相对旋转
+    Rimu.push_back(delta_q_imu.toRotationMatrix());                                  // hs: imu的相对旋转
+    Rc_g.push_back(ric.inverse() * delta_q_imu * ric);                               // hs: 不知道怎么用的。。。（？？？）
 
     Eigen::MatrixXd A(frame_count * 4, 4);
     A.setZero();
@@ -24,8 +24,7 @@ bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> c
         Quaterniond r2(Rc_g[i]);
 
         double angular_distance = 180 / M_PI * r1.angularDistance(r2);
-        ROS_DEBUG(
-            "%d %f", i, angular_distance);
+        ROS_DEBUG( "%d %f", i, angular_distance);
 
         double huber = angular_distance > 5.0 ? 5.0 / angular_distance : 1.0;
         ++sum_ok;
@@ -57,6 +56,8 @@ bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> c
     //cout << ric << endl;
     Vector3d ric_cov;
     ric_cov = svd.singularValues().tail<3>();
+
+    // hs: 应该至少累计10次以上才行，目的应该是进行不断优化
     if (frame_count >= WINDOW_SIZE && ric_cov(1) > 0.25)
     {
         calib_ric_result = ric;
